@@ -42,7 +42,6 @@ def loan_application(applicant):
                                  1.5))))
         )
         
-
         dti_adj = Real("dti_adj")
         solver.add(
             dti_adj ==
