@@ -2,13 +2,15 @@ from z3 import *
 
 class Applicant:
     def __init__(self, name, age, income, outstandingdebts,
-                 credit_score, requested, months, blacklisted):
+                credit_score, requested,
+                typeloan, months, blacklisted):
         self.name = name
         self.age = age
         self.income = income
         self.outstandingdebts = outstandingdebts
         self.credit_score = credit_score
         self.requested = requested
+        self.typeloan = typeloan
         self.months = months
         self.blacklisted = blacklisted
 
@@ -22,8 +24,21 @@ def loan_application(applicant):
     income = RealVal(applicant.income)
     score = applicant.credit_score
     months = applicant.months
+
+    is_personal = Bool('is_personal')
+    is_car = Bool('is_car')
+    is_house = Bool('is_house')
+
+    solver.add(Or(is_personal, is_car, is_house))
+    solver.add(Or(Not(is_personal), Not(is_car)))
+    solver.add(Or(Not(is_personal), Not(is_house)))
+    solver.add(Or(Not(is_car), Not(is_house)))
     
-    solver.add(approved == True)
+    solver.add(is_personal == (applicant.typeloan == 'personal'))
+    solver.add(is_car == (applicant.typeloan == 'car'))
+    solver.add(is_house == (applicant.typeloan == 'house'))
+
+    solver.add(Implies(is_car, applicant.requested <= 50000))
     
     if applicant.blacklisted:
         solver.add(approved == False)
@@ -33,7 +48,6 @@ def loan_application(applicant):
 
         base_rate = Real("base_rate")
         solver.add(base_rate == (1000 - score) * 0.017)
-        
 
         income_adj = Real("income_adj")
         solver.add(
@@ -63,10 +77,9 @@ def loan_application(applicant):
                                 0)
         )
         
-
         is_not_blacklisted = Not(BoolVal(applicant.blacklisted))
-        score_ok = score >= 500
-        rate_limit_ok = potential_rate <= 15.0
+        score_ok = score >= 100
+        rate_limit_ok = potential_rate <= 100.0
         income_min_ok = income >= 1000
 
         estimated_mp = applicant.requested / months + potential_rate/100 * applicant.requested / 12
@@ -110,7 +123,7 @@ def loan_application(applicant):
         print("RIFIUTATO")
         if applicant.blacklisted:
             print("Motivo: Cliente nella blacklist")
-        elif applicant.credit_score < 500:
+        elif applicant.credit_score < 100:
             print("Motivo: Credit score insufficiente")
         elif applicant.income < 1000:
             print("Motivo: Reddito insufficiente")
@@ -118,16 +131,14 @@ def loan_application(applicant):
             print("Motivo: Tasso o sostenibilità non rispettati")
 
 
-if __name__ == "__main__":
-    print("\n=== LOAN VALUTATION ===\n")
-    
-    maria = Applicant(name="Maria",
-                    age=34,
+maria = Applicant(name="Maria",
+                    age = 34,
                     income = 2000,
-                    outstandingdebts = 5353,
-                    credit_score = 750,
-                    requested = 28000,
+                    outstandingdebts = 553,
+                    credit_score = 700,
+                    requested = 20000,
+                    typeloan='house',
                     months = 100,
                     blacklisted = False)
     
-    loan_application(maria)
+loan_application(maria)
