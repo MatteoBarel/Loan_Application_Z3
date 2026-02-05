@@ -17,7 +17,9 @@ class Applicant:
         self.months = months
         self.blacklisted = blacklisted
 
+
 def loan_application(applicant):
+    
     solver = Solver()
     approved = Bool("approved")
 
@@ -29,8 +31,6 @@ def loan_application(applicant):
     score = applicant.credit_score
     months = applicant.months
     cosigner = BoolVal(applicant.cosigner)
-
-    
 
     solver.add(Implies(age >= 75, Not(approved)))
     solver.add(Implies(And(age <= 25, Not(cosigner)), Not(approved)))
@@ -100,7 +100,6 @@ def loan_application(applicant):
                     0)
     )
     
-    is_not_blacklisted = Not(BoolVal(applicant.blacklisted))
     score_ok = score >= 100
     rate_limit_ok = potential_rate <= 100.0
     income_min_ok = income >= 1000
@@ -119,6 +118,8 @@ def loan_application(applicant):
     )
 
     solver.add(Implies(Not(approved), rate == 0))
+
+    solver.add(Implies(applicant.blacklisted, Not(approved)))
 
     solver.add(approved)
 
@@ -172,6 +173,6 @@ maria = Applicant(name="Maria",
                     cosigner = True,
                     typeloan = 'car',
                     months = 120,
-                    blacklisted = False)
+                    blacklisted = True)
 
 loan_application(maria)
