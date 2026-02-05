@@ -1,11 +1,12 @@
 from z3 import *
 
 class Applicant:
-    def __init__(self, name, age, income, outstandingdebts,
+    def __init__(self, name, age, work, income, outstandingdebts,
                 credit_score, requested, cosigner,
                 typeloan, months, blacklisted):
         self.name = name
         self.age = age
+        self.work = work
         self.income = income
         self.outstandingdebts = outstandingdebts
         self.credit_score = credit_score
@@ -16,7 +17,6 @@ class Applicant:
         self.blacklisted = blacklisted
 
 def loan_application(applicant):
-   
     solver = Solver()
     approved = Bool("approved")
     rate = Real("rate")
@@ -37,6 +37,19 @@ def loan_application(applicant):
         solver.add(Implies(age >= 75, Not(approved)))
         solver.add(Implies(And(age <= 25, Not(cosigner)), Not(approved)))
 
+        is_permanent = Bool('is_permanent')
+        is_temporary = Bool('is_temporary')
+        is_unemployed = Bool('is_unemployed')
+
+        solver.add(Or(is_permanent, is_temporary, is_unemployed))
+        solver.add(Or(Not(is_permanent), Not(is_temporary)))
+        solver.add(Or(Not(is_permanent), Not(is_unemployed)))
+        solver.add(Or(Not(is_temporary), Not(is_unemployed)))
+    
+        solver.add(is_permanent == (applicant.typeloan == 'permanent'))
+        solver.add(is_temporary == (applicant.typeloan == 'temporary'))
+        solver.add(is_unemployed == (applicant.typeloan == 'unemployed'))
+
         is_personal = Bool('is_personal')
         is_car = Bool('is_car')
         is_house = Bool('is_house')
@@ -52,6 +65,9 @@ def loan_application(applicant):
 
         solver.add(Implies(is_car, applicant.requested <= 50000))
         solver.add(Implies(is_house, applicant.requested >= 30000))
+
+        solver.add(Implies(is_car, applicant.outstandingdebts <= 5000))
+
 
         base_rate = Real("base_rate")
         solver.add(base_rate == (1000 - score) * 0.017)
@@ -148,13 +164,14 @@ def loan_application(applicant):
 
 maria = Applicant(name="Maria",
                     age = 54,
+                    work = 'temporary',
                     income = 1500,
-                    outstandingdebts = 553,
+                    outstandingdebts = 5503,
                     credit_score = 700,
                     requested = 1000,
                     cosigner = False,
-                    typeloan = 'house',
-                    months = 100,
+                    typeloan = 'car',
+                    months = 120,
                     blacklisted = False)
-  
+
 loan_application(maria)
