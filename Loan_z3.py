@@ -19,7 +19,7 @@ class Applicant:
 
 
 def loan_application(applicant):
-    
+
     solver = Solver()
     approved = Bool("approved")
 
@@ -68,9 +68,9 @@ def loan_application(applicant):
 
     solver.add(Implies(is_car, applicant.outstandingdebts <= 5000))
 
-
     base_rate = Real("base_rate")
-    solver.add(base_rate == (1000 - score) * 0.017)
+    solver.add(Implies(age <= 35, base_rate == (1000 - score) * 0.017+0.5*Sqrt(35-age)))
+    solver.add(Implies(age > 35, base_rate == (1000 - score) * 0.017))
 
     income_adj = Real("income_adj")
     solver.add(
@@ -117,7 +117,6 @@ def loan_application(applicant):
         )
     )
 
-    solver.add(Implies(Not(approved), rate == 0))
 
     solver.add(Implies(applicant.blacklisted, Not(approved)))
 
@@ -164,15 +163,15 @@ def loan_application(applicant):
 
 
 maria = Applicant(name="Maria",
-                    age = 54,
-                    work = 'temporary',
-                    income = 1500,
-                    outstandingdebts = 503,
+                    age = 21,
+                    work = 'unemployed',
+                    income = 1000,
+                    outstandingdebts = 0,
                     credit_score = 700,
                     requested = 10000,
                     cosigner = True,
-                    typeloan = 'car',
+                    typeloan = 'personal',
                     months = 120,
-                    blacklisted = True)
+                    blacklisted = False)
 
 loan_application(maria)
