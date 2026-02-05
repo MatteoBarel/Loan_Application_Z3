@@ -4,6 +4,7 @@ class Applicant:
     def __init__(self, name, age, work, income, outstandingdebts,
                 credit_score, requested, cosigner,
                 typeloan, months, blacklisted):
+        
         self.name = name
         self.age = age
         self.work = work
@@ -19,6 +20,7 @@ class Applicant:
 def loan_application(applicant):
     solver = Solver()
     approved = Bool("approved")
+
     rate = Real("rate")
     monthly_payment = Real("monthly_payment")
     
@@ -28,99 +30,95 @@ def loan_application(applicant):
     months = applicant.months
     cosigner = BoolVal(applicant.cosigner)
 
-    if applicant.blacklisted:
-        solver.add(approved == False)
-        solver.add(rate == 0)
-        solver.add(monthly_payment == 0)
-
-    else:
-        solver.add(Implies(age >= 75, Not(approved)))
-        solver.add(Implies(And(age <= 25, Not(cosigner)), Not(approved)))
-
-        is_permanent = Bool('is_permanent')
-        is_temporary = Bool('is_temporary')
-        is_unemployed = Bool('is_unemployed')
-
-        solver.add(Or(is_permanent, is_temporary, is_unemployed))
-        solver.add(Or(Not(is_permanent), Not(is_temporary)))
-        solver.add(Or(Not(is_permanent), Not(is_unemployed)))
-        solver.add(Or(Not(is_temporary), Not(is_unemployed)))
     
-        solver.add(is_permanent == (applicant.work == 'permanent'))
-        solver.add(is_temporary == (applicant.work == 'temporary'))
-        solver.add(is_unemployed == (applicant.work == 'unemployed'))
 
-        solver.add(Implies(Xor(is_unemployed,is_temporary), cosigner))
+    solver.add(Implies(age >= 75, Not(approved)))
+    solver.add(Implies(And(age <= 25, Not(cosigner)), Not(approved)))
 
-        is_personal = Bool('is_personal')
-        is_car = Bool('is_car')
-        is_house = Bool('is_house')
+    is_permanent = Bool('is_permanent')
+    is_temporary = Bool('is_temporary')
+    is_unemployed = Bool('is_unemployed')
 
-        solver.add(Or(is_personal, is_car, is_house))
-        solver.add(Or(Not(is_personal), Not(is_car)))
-        solver.add(Or(Not(is_personal), Not(is_house)))
-        solver.add(Or(Not(is_car), Not(is_house)))
+    solver.add(Or(is_permanent, is_temporary, is_unemployed))
+    solver.add(Or(Not(is_permanent), Not(is_temporary)))
+    solver.add(Or(Not(is_permanent), Not(is_unemployed)))
+    solver.add(Or(Not(is_temporary), Not(is_unemployed)))
+
+    solver.add(is_permanent == (applicant.work == 'permanent'))
+    solver.add(is_temporary == (applicant.work == 'temporary'))
+    solver.add(is_unemployed == (applicant.work == 'unemployed'))
+
+    solver.add(Implies(Xor(is_unemployed,is_temporary), cosigner))
+
+    is_personal = Bool('is_personal')
+    is_car = Bool('is_car')
+    is_house = Bool('is_house')
+
+    solver.add(Or(is_personal, is_car, is_house))
+    solver.add(Or(Not(is_personal), Not(is_car)))
+    solver.add(Or(Not(is_personal), Not(is_house)))
+    solver.add(Or(Not(is_car), Not(is_house)))
+
+    solver.add(is_personal == (applicant.typeloan == 'personal'))
+    solver.add(is_car == (applicant.typeloan == 'car'))
+    solver.add(is_house == (applicant.typeloan == 'house'))
+
+    solver.add(Implies(is_car, applicant.requested <= 50000))
+    solver.add(Implies(is_house, applicant.requested >= 30000))
+
+    solver.add(Implies(is_car, applicant.outstandingdebts <= 5000))
+
+
+    base_rate = Real("base_rate")
+    solver.add(base_rate == (1000 - score) * 0.017)
+
+    income_adj = Real("income_adj")
+    solver.add(
+        income_adj ==
+        If(income >= 4500, -0.1,
+        If(income >= 3500,  0.2,
+        If(income >= 2500,  0.5,
+        If(income >= 2000,  1.0,
+                                1.5))))
+    )
     
-        solver.add(is_personal == (applicant.typeloan == 'personal'))
-        solver.add(is_car == (applicant.typeloan == 'car'))
-        solver.add(is_house == (applicant.typeloan == 'house'))
+    dti_adj = Real("dti_adj")
+    solver.add(
+        dti_adj ==
+        If(applicant.requested <= 10000, -0.5,
+        If(applicant.requested <= 25000,  0.0,
+        If(applicant.requested <= 40000,  0.5,
+                                            1.0)))
+    )
+    
+    potential_rate = base_rate + income_adj + dti_adj
+    solver.add(rate == If(approved, potential_rate, 0))
 
-        solver.add(Implies(is_car, applicant.requested <= 50000))
-        solver.add(Implies(is_house, applicant.requested >= 30000))
+    solver.add(
+        monthly_payment == If(approved, 
+                    applicant.requested / months + rate/100 * applicant.requested / months, 
+                    0)
+    )
+    
+    is_not_blacklisted = Not(BoolVal(applicant.blacklisted))
+    score_ok = score >= 100
+    rate_limit_ok = potential_rate <= 100.0
+    income_min_ok = income >= 1000
 
-        solver.add(Implies(is_car, applicant.outstandingdebts <= 5000))
-
-
-        base_rate = Real("base_rate")
-        solver.add(base_rate == (1000 - score) * 0.017)
-
-        income_adj = Real("income_adj")
-        solver.add(
-            income_adj ==
-            If(income >= 4500, -0.1,
-            If(income >= 3500,  0.2,
-            If(income >= 2500,  0.5,
-            If(income >= 2000,  1.0,
-                                 1.5))))
+    estimated_mp = applicant.requested / months + potential_rate/100 * applicant.requested / 12
+    
+    solver.add(
+        approved == And(
+        score_ok,
+        rate_limit_ok,
+        income_min_ok,
+        If(is_house, 
+            estimated_mp <= 0.5 * income,  
+            estimated_mp <= 0.2 * income)
         )
-        
-        dti_adj = Real("dti_adj")
-        solver.add(
-            dti_adj ==
-            If(applicant.requested <= 10000, -0.5,
-            If(applicant.requested <= 25000,  0.0,
-            If(applicant.requested <= 40000,  0.5,
-                                              1.0)))
-        )
-        
-        potential_rate = base_rate + income_adj + dti_adj
-        solver.add(rate == If(approved, potential_rate, 0))
+    )
 
-        solver.add(
-            monthly_payment == If(approved, 
-                        applicant.requested / months + rate/100 * applicant.requested / months, 
-                        0)
-        )
-        
-        is_not_blacklisted = Not(BoolVal(applicant.blacklisted))
-        score_ok = score >= 100
-        rate_limit_ok = potential_rate <= 100.0
-        income_min_ok = income >= 1000
-
-        estimated_mp = applicant.requested / months + potential_rate/100 * applicant.requested / 12
-        
-        solver.add(
-            approved == And(
-            score_ok,
-            rate_limit_ok,
-            income_min_ok,
-            If(is_house, 
-                estimated_mp <= 0.5 * income,  
-                estimated_mp <= 0.2 * income)
-            )
-        )
-
-        solver.add(Implies(Not(approved), rate == 0))
+    solver.add(Implies(Not(approved), rate == 0))
 
     solver.add(approved)
 
@@ -171,9 +169,9 @@ maria = Applicant(name="Maria",
                     outstandingdebts = 503,
                     credit_score = 700,
                     requested = 10000,
-                    cosigner = False,
+                    cosigner = True,
                     typeloan = 'car',
                     months = 120,
-                    blacklisted = True)
+                    blacklisted = False)
 
 loan_application(maria)
