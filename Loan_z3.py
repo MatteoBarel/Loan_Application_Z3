@@ -73,7 +73,7 @@ def loan_application(applicant):
     solver.add(is_car == (applicant.typeloan == 'car'))
     solver.add(is_house == (applicant.typeloan == 'house'))
 
-    solver.add(Implies(is_car, applicant.requested <= 50000))
+    solver.add(Implies(Or(is_car,is_personal), applicant.requested <= 50000))
     solver.add(Implies(is_house, applicant.requested >= 30000))
 
 
@@ -81,21 +81,19 @@ def loan_application(applicant):
     #definiamo il tasso base secondo lo score (è giovane viene "penalizzato")
 
     base_rate = Real("base_rate")
-    solver.add(Implies(age <= 35, base_rate == (1000 - score) * 0.017 + 0.5*Sqrt(35-age)))
-    solver.add(Implies(age > 35, base_rate == (1000 - score) * 0.017))
+    solver.add(Implies(age <= 35, base_rate == (1000 - score) * 0.021 + 0.5*Sqrt(35-age)))
+    solver.add(Implies(age > 35, base_rate == (1000 - score) * 0.021))
 
     #abbassiamo il tasso per il mutuo
 
     type_adj = Real("type_adj")
-    solver.add(
-        type_adj ==
-        If(is_house, -2.0,0)
-    )
+    solver.add(And(
+        Implies(is_house, type_adj == -4.5),
+        Implies(Not(is_house), type_adj == 0.0)
+    ))
 
 
     #aggiustiamo il tasso in base alle entrate
-
-
 
     income_adj = Real("income_adj")
 
@@ -112,10 +110,12 @@ def loan_application(applicant):
 
     dti_adj = Real("dti_adj")
     solver.add(And(
-        Implies(applicant.requested >= 40000, dti_adj == 0.5),
-        Implies(And(applicant.requested >= 20000, applicant.requested < 40000), dti_adj == 0.3),
-        Implies(And(applicant.requested >= 0, applicant.requested < 20000), dti_adj == 0.1),
-        Or(is_car,is_personal)
+
+        Implies(And(Or(is_car, is_personal), applicant.requested >= 40000), dti_adj == 0.2),
+        Implies(And(Or(is_car, is_personal), applicant.requested >= 20000, applicant.requested < 40000), dti_adj == 0.1),
+        Implies(And(Or(is_car, is_personal), applicant.requested >= 0, applicant.requested < 20000), dti_adj == 0.0),
+ 
+        Implies(is_house, dti_adj == 0)
     ))
 
 
@@ -124,23 +124,15 @@ def loan_application(applicant):
     solver.add(rate == If(approved, base_rate + type_adj + income_adj + dti_adj, 0))
 
 
-    #rata mensile
+    #rata mensile    
 
-    solver.add(
-        monthly_payment == If(approved, 
-                    applicant.requested / months + rate/100 * applicant.requested / months, 
-                    0)
-    )
+    mp = applicant.requested / months + rate/100 * applicant.requested / 12
     
+    solver.add(And(
+        Implies(is_house, approved == (mp <= 0.5 * income)),
+        Implies(Not(is_house), approved == (mp <= 0.2 * income))
+    ))
 
-    mp = applicant.requested / months + rate/100 * applicant.requested / months
-    
-    solver.add(
-        approved == 
-        If(is_house, 
-            mp <= 0.5 * income,  
-            mp <= 0.2 * income)
-        )
 
 
     solver.add(Implies(applicant.blacklisted, Not(approved)))
@@ -162,11 +154,11 @@ def loan_application(applicant):
         print(f"Importo: €{applicant.requested}")
         print(f"Credit score: {applicant.credit_score}")
             
-        mp = model.eval(monthly_payment)
+        mp = model.eval(mp)
         mp_val = float(mp.as_decimal(10).replace("?", ""))
             
         print(f"Rata mensile ({months} mesi): €{mp_val:.2f}")
-        interests = mp_val *months - applicant.requested
+        interests = mp_val * months - applicant.requested
         print(f"Interessi totali: €{interests:.2f}")
 
     else:
@@ -187,16 +179,16 @@ def loan_application(applicant):
             print("Motivo: Tasso o sostenibilità non rispettati")
 
 
-maria = Applicant(name="Maria",
-                    age =54,
+mario = Applicant(name="Mario",
+                    age = 45,
                     work = 'permanent',
-                    income = 3400,
+                    income = 1400,
                     networth = 10000,
                     credit_score = 650,
-                    requested = 50000,
+                    requested = 60000,
                     cosigner = False,
-                    typeloan = 'car',
-                    months = 120,
+                    typeloan = 'house',
+                    months = 360,
                     blacklisted = False)
 
-loan_application(maria)
+loan_application(mario)
