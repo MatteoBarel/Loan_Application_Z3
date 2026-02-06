@@ -112,9 +112,9 @@ def loan_application(applicant):
 
     dti_adj = Real("dti_adj")
     solver.add(And(
-        Implies(applicant.requested < 40000, dti_adj == 0.5),
-        Implies((applicant.requested >= 20000, applicant.requested < 40000), dti_adj == 0.3),
-        Implies((applicant.requested >= 5000, applicant.requested < 20000), dti_adj == 0.1),
+        Implies(applicant.requested >= 40000, dti_adj == 0.5),
+        Implies(And(applicant.requested >= 20000, applicant.requested < 40000), dti_adj == 0.3),
+        Implies(And(applicant.requested >= 0, applicant.requested < 20000), dti_adj == 0.1),
         Or(is_car,is_personal)
     ))
 
@@ -193,7 +193,7 @@ maria = Applicant(name="Maria",
                     income = 3400,
                     networth = 10000,
                     credit_score = 650,
-                    requested = 40000,
+                    requested = 50000,
                     cosigner = False,
                     typeloan = 'car',
                     months = 120,
