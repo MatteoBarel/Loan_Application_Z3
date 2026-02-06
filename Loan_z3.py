@@ -1,7 +1,7 @@
 from z3 import *
 
 class Applicant:
-    def __init__(self, name, age, work, income, outstandingdebts,
+    def __init__(self, name, age, work, income, networth,
                 credit_score, requested, cosigner,
                 typeloan, months, blacklisted):
         
@@ -9,7 +9,7 @@ class Applicant:
         self.age = age
         self.work = work
         self.income = income
-        self.outstandingdebts = outstandingdebts
+        self.networth = networth
         self.credit_score = credit_score
         self.requested = requested
         self.cosigner = cosigner
@@ -76,7 +76,6 @@ def loan_application(applicant):
     solver.add(Implies(is_car, applicant.requested <= 50000))
     solver.add(Implies(is_house, applicant.requested >= 30000))
 
-    solver.add(Implies(is_car, applicant.outstandingdebts <= 5000))
 
 
     #definiamo il tasso base secondo lo score (è giovane viene "penalizzato")
@@ -96,28 +95,29 @@ def loan_application(applicant):
 
     #aggiustiamo il tasso in base alle entrate
 
+
+
     income_adj = Real("income_adj")
-    solver.add(
-        income_adj ==
-        If(income >= 4500, -0.1,
-        If(income >= 3500,  0.0,
-        If(income >= 2500,  0.1,
-        If(income >= 2000,  0.2,
-                                0.3))))
-    )
-    
+
+    solver.add(And(
+        Implies(income >= 4500, income_adj == -0.1),
+        Implies(And(income >= 3500, income < 4500), income_adj == 0.0),
+        Implies(And(income >= 2500, income < 3500), income_adj == 0.1),
+        Implies(And(income >= 2000, income < 2500), income_adj == 0.2),
+        Implies(income < 2000, income_adj == 0.3),
+    ))
+
 
     #aggiustiamo il tasso in base alla richiesta
 
     dti_adj = Real("dti_adj")
-    solver.add(
-        dti_adj ==
-        If(applicant.requested <= 10000, -0.1,
-        If(applicant.requested <= 25000,  0.0,
-        If(applicant.requested <= 40000,  0.1,
-                                            0.2)))
-    )
-    
+    solver.add(And(
+        Implies(applicant.requested < 40000, dti_adj == 0.5),
+        Implies((applicant.requested >= 20000, applicant.requested < 40000), dti_adj == 0.3),
+        Implies((applicant.requested >= 5000, applicant.requested < 20000), dti_adj == 0.1),
+        Or(is_car,is_personal)
+    ))
+
 
     #sommiamo le caratteristiche
 
@@ -191,10 +191,10 @@ maria = Applicant(name="Maria",
                     age =54,
                     work = 'permanent',
                     income = 3400,
-                    outstandingdebts = 0,
+                    networth = 10000,
                     credit_score = 650,
                     requested = 40000,
-                    cosigner = True,
+                    cosigner = False,
                     typeloan = 'car',
                     months = 120,
                     blacklisted = False)
