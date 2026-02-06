@@ -110,6 +110,8 @@ def loan_application(applicant):
     )
     
 
+    #
+
     potential_rate = base_rate + income_adj + dti_adj
     solver.add(rate == If(approved, potential_rate, 0))
 
