@@ -18,6 +18,7 @@ class Applicant:
         self.blacklisted = blacklisted
 
 
+
 def loan_application(applicant):
 
     solver = Solver()
