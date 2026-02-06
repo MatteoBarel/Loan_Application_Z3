@@ -32,8 +32,14 @@ def loan_application(applicant):
     months = applicant.months
     cosigner = BoolVal(applicant.cosigner)
 
+
+    #implicazioni per l'età
+
     solver.add(Implies(age >= 75, Not(approved)))
     solver.add(Implies(And(age <= 25, Not(cosigner)), Not(approved)))
+
+
+    #definiamo i tipi di lavoro, ogni richiedente può avere solo un tipo di lavoro
 
     is_permanent = Bool('is_permanent')
     is_temporary = Bool('is_temporary')
@@ -49,6 +55,9 @@ def loan_application(applicant):
     solver.add(is_unemployed == (applicant.work == 'unemployed'))
 
     solver.add(Implies(Xor(is_unemployed,is_temporary), cosigner))
+
+
+    #definiamo i tipi di prestito richiesto, al più uno per richiedente
 
     is_personal = Bool('is_personal')
     is_car = Bool('is_car')
@@ -68,9 +77,15 @@ def loan_application(applicant):
 
     solver.add(Implies(is_car, applicant.outstandingdebts <= 5000))
 
+
+    #definiamo il tasso base secondo lo score, ma se è giovane viene "penalizzato"
+
     base_rate = Real("base_rate")
-    solver.add(Implies(age <= 35, base_rate == (1000 - score) * 0.017+0.5*Sqrt(35-age)))
+    solver.add(Implies(age <= 35, base_rate == (1000 - score) * 0.017 + 0.5*Sqrt(35-age)))
     solver.add(Implies(age > 35, base_rate == (1000 - score) * 0.017))
+
+
+    #aggiustiamo il tasso in base alle entrate
 
     income_adj = Real("income_adj")
     solver.add(
@@ -82,15 +97,19 @@ def loan_application(applicant):
                                 1.5))))
     )
     
+
+    #aggiustiamo il tasso in base alla richiesta
+
     dti_adj = Real("dti_adj")
     solver.add(
         dti_adj ==
-        If(applicant.requested <= 10000, -0.5,
+        If(applicant.requested <= 10000, -0.1,
         If(applicant.requested <= 25000,  0.0,
-        If(applicant.requested <= 40000,  0.5,
-                                            1.0)))
+        If(applicant.requested <= 40000,  0.1,
+                                            0.2)))
     )
     
+
     potential_rate = base_rate + income_adj + dti_adj
     solver.add(rate == If(approved, potential_rate, 0))
 
