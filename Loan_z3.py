@@ -58,7 +58,7 @@ def loan_application(applicant):
     solver.add(Implies(Xor(is_unemployed,is_temporary), cosigner))
 
 
-    #definiamo i tipi di prestito richiesto, al più uno per richiedente
+    #definiamo i tipi di prestito richiesto (al più uno per richiedente) e le condizioni
 
     is_personal = Bool('is_personal')
     is_car = Bool('is_car')
@@ -79,11 +79,19 @@ def loan_application(applicant):
     solver.add(Implies(is_car, applicant.outstandingdebts <= 5000))
 
 
-    #definiamo il tasso base secondo lo score, ma se è giovane viene "penalizzato"
+    #definiamo il tasso base secondo lo score (è giovane viene "penalizzato")
 
     base_rate = Real("base_rate")
     solver.add(Implies(age <= 35, base_rate == (1000 - score) * 0.017 + 0.5*Sqrt(35-age)))
     solver.add(Implies(age > 35, base_rate == (1000 - score) * 0.017))
+
+    #abbassiamo il tasso per il mutuo
+
+    type_adj = Real("type_adj")
+    solver.add(
+        type_adj ==
+        If(is_house, -2.0,0)
+    )
 
 
     #aggiustiamo il tasso in base alle entrate
@@ -92,10 +100,10 @@ def loan_application(applicant):
     solver.add(
         income_adj ==
         If(income >= 4500, -0.1,
-        If(income >= 3500,  0.2,
-        If(income >= 2500,  0.5,
-        If(income >= 2000,  1.0,
-                                1.5))))
+        If(income >= 3500,  0.0,
+        If(income >= 2500,  0.1,
+        If(income >= 2000,  0.2,
+                                0.3))))
     )
     
 
@@ -111,10 +119,12 @@ def loan_application(applicant):
     )
     
 
-    #
+    #sommiamo le caratteristiche
 
-    potential_rate = base_rate + income_adj + dti_adj
-    solver.add(rate == If(approved, potential_rate, 0))
+    solver.add(rate == If(approved, base_rate + type_adj + income_adj + dti_adj, 0))
+
+
+    #rata mensile
 
     solver.add(
         monthly_payment == If(approved, 
@@ -122,22 +132,15 @@ def loan_application(applicant):
                     0)
     )
     
-    score_ok = score >= 100
-    rate_limit_ok = potential_rate <= 100.0
-    income_min_ok = income >= 1000
 
-    estimated_mp = applicant.requested / months + potential_rate/100 * applicant.requested / 12
+    mp = applicant.requested / months + rate/100 * applicant.requested / months
     
     solver.add(
-        approved == And(
-        score_ok,
-        rate_limit_ok,
-        income_min_ok,
+        approved == 
         If(is_house, 
-            estimated_mp <= 0.5 * income,  
-            estimated_mp <= 0.2 * income)
+            mp <= 0.5 * income,  
+            mp <= 0.2 * income)
         )
-    )
 
 
     solver.add(Implies(applicant.blacklisted, Not(approved)))
@@ -185,14 +188,14 @@ def loan_application(applicant):
 
 
 maria = Applicant(name="Maria",
-                    age = 21,
-                    work = 'unemployed',
-                    income = 1000,
+                    age =54,
+                    work = 'permanent',
+                    income = 3400,
                     outstandingdebts = 0,
-                    credit_score = 700,
-                    requested = 10000,
+                    credit_score = 650,
+                    requested = 40000,
                     cosigner = True,
-                    typeloan = 'personal',
+                    typeloan = 'car',
                     months = 120,
                     blacklisted = False)
 
